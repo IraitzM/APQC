@@ -1,0 +1,32 @@
+[project]
+name = "APQC"
+version = "0.1.0"
+description = "Based on Accelerated Probabilistic Quantum Clustering"
+authors = [
+    {name = "Iraitz", email = "iraitzm@gmail.com"},
+]
+dependencies = [
+    "networkx>=2.8",
+    "numba>=0.55.2",
+    "numpy>=1.22.2",
+    "tensorflow>=2.7.0",
+    "scipy>=1.8.0",
+    "scikit-learn>=1.0.2",
+    "pandas>=1.4.2"
+]
+requires-python = ">=3.8,<3.12"
+readme = "README.md"
+license = {text = "MIT"}
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[tool.pdm.dev-dependencies]
+visualizations = [
+    "matplotlib>=3.7.2",
+    "seaborn>=0.12.2",
+]
+notebook = [
+    "ipykernel>=6.25.1",
+]

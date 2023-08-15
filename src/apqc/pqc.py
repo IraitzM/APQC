@@ -16,7 +16,7 @@ from scipy import interpolate
 from scipy.cluster.hierarchy import dendrogram, linkage, num_obs_linkage, fcluster
 from scipy.spatial.distance import pdist, squareform
 
-from pqc_utils.pqc_utils import (pairwise_d2_mat_v3, pairwise_d2_mat_v2, reduce_sum, reduce_mean, nb_sort, nb_mean,
+from .utils import (pairwise_d2_mat_v3, pairwise_d2_mat_v2, reduce_sum, reduce_mean, nb_sort, nb_mean,
                                  moving_average, set_float_type, optimizers_classes)
 
 # # TODO This really helps?

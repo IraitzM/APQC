@@ -4,7 +4,7 @@ from typing import Optional, Union
 import numpy as np
 import tensorflow as tf
 
-from pqc_utils.pqc_utils import pairwise_d2_mat_v2, set_float_type, optimizers_classes
+from .utils import pairwise_d2_mat_v2, set_float_type, optimizers_classes
 
 
 class DensityEstimator:
@@ -32,8 +32,14 @@ class DensityEstimator:
             print("Batch is greater than the sample size, therefor it is reduced to sample size.")
         self.batch: int = min(batch, self.N_gen)
         if scale is not None:
-            self.scale = tf.cast(tf.sqrt(tf.reduce_mean(tf.reduce_mean(tf.square(data_gen), axis=1))),
-                                 dtype=self.float_type)
+            self.scale = tf.cast(
+                tf.sqrt(
+                    tf.reduce_mean(
+                        tf.reduce_mean(
+                            tf.square(data_gen), axis=1
+                            )
+                        )
+                    ),dtype=self.float_type)
         else:
             self.scale = tf.constant(scale, dtype=self.float_type)
 
