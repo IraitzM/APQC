@@ -241,8 +241,8 @@ class DensityEstimator:
             )
 
             loss_array = loss_array.write(self.step.value(), loss)
-            if self.step.value() % 200 == 0:
-                tf.print(self.loss_0.value())
+            #if self.step.value() % 200 == 0:
+            #    tf.print(self.loss_0.value())
             self.step.assign_add(1)
 
             # loss_list.append(loss.numpy())

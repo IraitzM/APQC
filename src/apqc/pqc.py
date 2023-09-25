@@ -45,7 +45,7 @@ class PQC:
 
         self.float_type = set_float_type(float_type)
         if batch > self.N_gen:
-            print("Batch is greater than the sample size, therefor it is reduced to sample size.")
+            print("Batch is greater than the sample size, therefore it is reduced to sample size.")
         self.batch: int = min(batch, self.N_gen)
         self.force_cpu: bool = force_cpu
         gpus = tf.config.experimental.list_physical_devices('GPU')
@@ -152,7 +152,7 @@ class PQC:
         :return:
         """
         device = self.device if not self.force_cpu else "CPU:0"
-        knn_indices = np.array([int(i * self.N_gen) for i in knn_ratios], dtype=np.int)
+        knn_indices = np.array([int(i * self.N_gen) for i in knn_ratios], dtype=int)
         with tf.device(device):
             t0 = time.time()
             knn_d2 = PQC.knn_d2_batched_v1(data=self.data_gen.numpy(),  # If _v1 .numpy() is not needed.
@@ -662,7 +662,7 @@ class PQC:
 
         merged_sample_proba_labels = np.zeros_like(merged_sample_labels)
         merged_loglikelihood = np.zeros(len(energies))
-        cluster_proba_number = np.zeros(len(energies), dtype=np.int)
+        cluster_proba_number = np.zeros(len(energies), dtype=int)
         for k in range(len(energies)):
             _, p_labels, ll = self.cluster_probability_per_sample_batched(data_train=self.data_gen,
                                                                           labels=merged_sample_labels[:, k],
@@ -742,7 +742,6 @@ class PQC:
             self.cluster_allocation_by_sgd()
             self.cluster_allocation_by_probability()
             do_it = self.hierarchical_energy_merge()
-            print((knn_ratio_i, do_it))
         t1 = time.time()
 
         print(f"Scanning time: {round(t1 - t0, 3)} s")
