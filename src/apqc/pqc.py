@@ -162,8 +162,6 @@ class PQC:
                 self.knn_d2.update({round(knn_ratio, 2): tf.reshape(knn_d2[:, i], [-1, 1])})
 
             t1 = time.time()
-            print(f"Elapsed time for computing the full data_gen pairwise"
-                  f" distance matrix: {round(t1 - t0, 3)} s")
 
     def get_knn_variance(self, knn_ratio: float):
         if self.N_gen > 1:
@@ -229,7 +227,6 @@ class PQC:
                 t0 = time.time()
 
                 k_proba_joint_i, _ = reduce_sum(data=wave_i.numpy(), vector=labels)
-                print(f"Reduce op runtime: {round(time.time() - t0, 3)} s")
 
                 k_proba_sum = np.sum(k_proba_joint_i, axis=0, keepdims=True)
                 k_proba_i = k_proba_joint_i / k_proba_sum
@@ -247,10 +244,8 @@ class PQC:
             return k_winner_proba, k_winner, loglikelihood
 
     def cluster_allocation_by_probability(self):
-        t0 = time.time()
         self.k_proba, self.proba_labels, self.ll = self.cluster_probability_per_sample_batched(data_train=self.data_gen,
                                                                                                labels=self.sgd_labels)
-        print(f"Computed clusters probabilities in {round(time.time() - t0, 3)} s")
 
         p_k = {k: v for k, v in Counter(self.proba_labels).items()}
         self.p_x_k = np.array([p_label / p_k[label]
@@ -259,7 +254,6 @@ class PQC:
         self.update_basic_results()
 
         k_num_proba = len(np.unique(self.proba_labels))
-        print(f"Detected {k_num_proba} probability clusters.")
         if self.merge_by_proba_clusters:
             self.k_num = k_num_proba
 
@@ -360,7 +354,7 @@ class PQC:
                       steps: int = 20000,
                       infinite_steps: bool = False,
                       patience: int = 4,
-                      plot_allocation: bool = True):
+                      plot_allocation: bool = False):
 
         if len(data_train0.shape) == 1:
             if isinstance(data_train0, np.ndarray):
@@ -492,16 +486,12 @@ class PQC:
 
         return loss, dx, dx2, self.step
 
-    def cluster_allocation_by_sgd(self, data: Optional[Union[np.ndarray, tf.Tensor]] = None):
-        t0 = time.time()
+    def cluster_allocation_by_sgd(self, data: Optional[Union[np.ndarray, tf.Tensor]] = None, plot_allocation:bool = False):
         if data is None:
-            _, mean_steps = self.pot_grad_desc(data_train0=self.data_gen)
-            print(f"Generative data is trained in {np.round(mean_steps, 3)} steps and {round(time.time() - t0, 3)} s")
+            self.pot_grad_desc(data_train0=self.data_gen, plot_allocation=plot_allocation)
         else:
-            _, mean_steps = self.pot_grad_desc(data_train0=data)
-            print(f"Data is trained in {np.round(mean_steps, 3)} steps and {round(time.time() - t0, 3)} s")
+            self.pot_grad_desc(data_train0=data, plot_allocation=plot_allocation)
 
-        t1 = time.time()
         pw_mat = pdist(X=self.data_trained, metric="euclidean")
         pw_mat = pw_mat > self.err.numpy().max()
         z = linkage(pw_mat)
@@ -511,11 +501,8 @@ class PQC:
         for i, (k, c) in enumerate(sgd_labels_tuple):
             self.sgd_labels[sgd_labels_pre == k] = i
 
-        print(f"Time to get labels from connected pairs: {round(time.time() - t1, 3)} s")
-
         self.k_num = np.max(self.sgd_labels) + 1
-        print(f"Detected {self.k_num} clusters, having {np.sum(self.sgd_labels == 0)} samples the"
-              f" most populated cluster.")
+        return self.k_num
 
     @staticmethod
     def get_labels_from_connected_pairs(con_pairs: np.ndarray, data_size: int):
