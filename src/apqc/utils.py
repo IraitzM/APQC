@@ -1,7 +1,7 @@
 from math import log10, floor
 from typing import Union
 
-import numba as nb
+from numba import jit
 import numpy as np
 import tensorflow as tf
 
@@ -12,7 +12,7 @@ import sys
 SMALL_MERGESORT_NUMBA = 40
 
 
-@nb.jit(nopython=True)
+@jit(nopython=True, fastmath=True, parallel=True)
 def merge_numba(a, aux, lo, mid, hi):
 
     i = lo
@@ -32,7 +32,7 @@ def merge_numba(a, aux, lo, mid, hi):
             i += 1
 
 
-@nb.jit(nopython=True)
+@jit(nopython=True, fastmath=True, parallel=True)
 def insertion_sort_numba(a, lo, hi):
 
     for i in range(lo + 1, hi + 1):
@@ -44,7 +44,7 @@ def insertion_sort_numba(a, lo, hi):
         a[j + 1] = key
 
 
-@nb.jit(nopython=True)
+@jit(nopython=True, fastmath=True, parallel=True)
 def merge_sort_numba(a, aux, lo, hi):
 
     if hi - lo > SMALL_MERGESORT_NUMBA:
@@ -60,7 +60,7 @@ def merge_sort_numba(a, aux, lo, hi):
         insertion_sort_numba(aux, lo, hi)
 
 
-@nb.jit(nopython=True)
+@jit(nopython=True, fastmath=True, parallel=True)
 def merge_sort_main_numba(a):
     b = np.copy(a)
     aux = np.copy(a)
@@ -125,9 +125,7 @@ def pairwise_d2_mat_v2(a, b):
     r_b = tf.reshape(r_b, [-1, 1])
     return r_a - 2 * tf.matmul(a, tf.transpose(b)) + tf.transpose(r_b)
 
-
-# @nb.jit(nb.float32[:](nb.float32[:], nb.float32[:]), nopython=True)
-@nb.njit
+@jit(nopython=True, fastmath=True, parallel=True)
 def pairwise_d2_mat_v3(a, b):
     r_a = np.sum(a * a, 1)
     r_b = np.sum(b * b, 1)
@@ -155,7 +153,7 @@ def round_it(x, sig):
     return round(x, sig - int(floor(log10(abs(x)))) - 1)
 
 
-@nb.njit  # @nb.jit(nopython=True, fastmath=True, parallel=True)
+@jit(nopython=True, fastmath=True, parallel=True)
 def reduce_mean(data, vector):
     u_values = np.unique(vector)
     n, d = data.shape
@@ -166,7 +164,7 @@ def reduce_mean(data, vector):
     return reduced_data, u_values
 
 
-@nb.njit
+@jit(nopython=True, fastmath=True, parallel=True)
 def reduce_sum(data, vector):
     u_values = np.unique(vector)
     n, d = data.shape
@@ -177,7 +175,7 @@ def reduce_sum(data, vector):
     return reduced_data, u_values
 
 
-@nb.njit
+@jit(nopython=True, fastmath=True, parallel=True)
 def reduce_first(data, vector):
     u_values = np.unique(vector)
     n, d = data.shape
@@ -188,7 +186,7 @@ def reduce_first(data, vector):
     return reduced_data, u_values
 
 
-@nb.njit
+@jit(nopython=True, fastmath=True, parallel=True)
 def no_reduce_along_axis(func1d, axis, arr):
     assert arr.ndim == 2
     assert axis in [0, 1]
@@ -203,7 +201,7 @@ def no_reduce_along_axis(func1d, axis, arr):
     return result
 
 
-@nb.njit
+@jit(nopython=True, fastmath=True, parallel=True)
 def reduce_along_axis(func1d, axis, arr):
     assert arr.ndim == 2
     assert axis in [0, 1]
@@ -218,22 +216,22 @@ def reduce_along_axis(func1d, axis, arr):
     return result
 
 
-@nb.njit
+@jit(nopython=True, fastmath=True, parallel=True)
 def nb_mean(array, axis):
     return reduce_along_axis(np.mean, axis, array)
 
 
-@nb.njit
+@jit(nopython=True, fastmath=True, parallel=True)
 def nb_std(array, axis):
     return reduce_along_axis(np.std, axis, array)
 
 
-@nb.njit
+@jit(nopython=True, fastmath=True, parallel=True)
 def nb_sum(array, axis):
     return reduce_along_axis(np.sum, axis, array)
 
 
-@nb.njit
+@jit(nopython=True, fastmath=True, parallel=True)
 def nb_sort(array: np.ndarray, axis: int):
     return no_reduce_along_axis(merge_sort_main_numba, axis, array)
 

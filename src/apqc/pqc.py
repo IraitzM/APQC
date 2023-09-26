@@ -9,7 +9,7 @@ from typing import Optional, Union, List, Tuple, Dict
 import matplotlib.pyplot as plt
 import seaborn as sns
 import networkx as nx
-import numba as nb
+from numba import jit
 import numpy as np
 import tensorflow as tf
 from scipy import interpolate
@@ -128,7 +128,7 @@ class PQC:
         return knn_d2_mat
 
     @staticmethod
-    @nb.jit(nopython=True, fastmath=True, parallel=True)
+    @jit(nopython=True, fastmath=True, parallel=True)
     def knn_d2_batched_v2(data, batch_size, knn_indices):
 
         knn_d2_mat = np.empty((len(data), knn_indices.size), dtype=np.float32)

@@ -1,6 +1,6 @@
 [project]
 name = "APQC"
-version = "0.1.0"
+version = "0.1.1"
 description = "Based on Accelerated Probabilistic Quantum Clustering"
 authors = [
     {name = "Iraitz", email = "iraitzm@gmail.com"},
