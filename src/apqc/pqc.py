@@ -37,7 +37,8 @@ class PQC:
                  float_type: int = 32,
                  batch: int = 2000,
                  merge_by_proba_clusters: bool = True,
-                 force_cpu: bool = False):
+                 force_cpu: bool = False,
+                 max_num_clusters:int = 120):
 
         if len(data_gen.shape) == 1:
             data_gen = data_gen.reshape(-1, 1)
@@ -98,7 +99,7 @@ class PQC:
         self.p_x_k: Optional[np.ndarray] = None
 
         self.k_num: Optional[int] = None
-        self.max_cluster_number: int = 120
+        self.max_cluster_number = max_num_clusters
         self.basic_results: dict = {}
         self.energy_merge_results: dict = {}
         self.merge_by_proba_clusters: bool = merge_by_proba_clusters
@@ -162,8 +163,6 @@ class PQC:
                 self.knn_d2.update({round(knn_ratio, 2): tf.reshape(knn_d2[:, i], [-1, 1])})
 
             t1 = time.time()
-            print(f"Elapsed time for computing the full data_gen pairwise"
-                  f" distance matrix: {round(t1 - t0, 3)} s")
 
     def get_knn_variance(self, knn_ratio: float):
         if self.N_gen > 1:
@@ -229,7 +228,6 @@ class PQC:
                 t0 = time.time()
 
                 k_proba_joint_i, _ = reduce_sum(data=wave_i.numpy(), vector=labels)
-                print(f"Reduce op runtime: {round(time.time() - t0, 3)} s")
 
                 k_proba_sum = np.sum(k_proba_joint_i, axis=0, keepdims=True)
                 k_proba_i = k_proba_joint_i / k_proba_sum
@@ -247,10 +245,8 @@ class PQC:
             return k_winner_proba, k_winner, loglikelihood
 
     def cluster_allocation_by_probability(self):
-        t0 = time.time()
         self.k_proba, self.proba_labels, self.ll = self.cluster_probability_per_sample_batched(data_train=self.data_gen,
                                                                                                labels=self.sgd_labels)
-        print(f"Computed clusters probabilities in {round(time.time() - t0, 3)} s")
 
         p_k = {k: v for k, v in Counter(self.proba_labels).items()}
         self.p_x_k = np.array([p_label / p_k[label]
@@ -259,7 +255,6 @@ class PQC:
         self.update_basic_results()
 
         k_num_proba = len(np.unique(self.proba_labels))
-        print(f"Detected {k_num_proba} probability clusters.")
         if self.merge_by_proba_clusters:
             self.k_num = k_num_proba
 
@@ -360,7 +355,7 @@ class PQC:
                       steps: int = 20000,
                       infinite_steps: bool = False,
                       patience: int = 4,
-                      plot_allocation: bool = True):
+                      plot_allocation: bool = False):
 
         if len(data_train0.shape) == 1:
             if isinstance(data_train0, np.ndarray):
@@ -438,12 +433,6 @@ class PQC:
 
         self.err = tf.stack([dx1, dx2])  # First error always is greater or equal thant second error.
 
-        if plot_allocation:
-            plt.figure()
-            sns.scatterplot(x=self.data_gen[:, 0], y=self.data_gen[:, 1], alpha=0.15)
-            sns.scatterplot(x=self.data_trained[:, 0], y=self.data_trained[:, 1], alpha=0.5)
-            plt.show()
-
         return loss, mean_steps
 
     @tf.function
@@ -492,16 +481,12 @@ class PQC:
 
         return loss, dx, dx2, self.step
 
-    def cluster_allocation_by_sgd(self, data: Optional[Union[np.ndarray, tf.Tensor]] = None):
-        t0 = time.time()
+    def cluster_allocation_by_sgd(self, data: Optional[Union[np.ndarray, tf.Tensor]] = None, plot_allocation:bool = False):
         if data is None:
-            _, mean_steps = self.pot_grad_desc(data_train0=self.data_gen)
-            print(f"Generative data is trained in {np.round(mean_steps, 3)} steps and {round(time.time() - t0, 3)} s")
+            self.pot_grad_desc(data_train0=self.data_gen, plot_allocation=plot_allocation)
         else:
-            _, mean_steps = self.pot_grad_desc(data_train0=data)
-            print(f"Data is trained in {np.round(mean_steps, 3)} steps and {round(time.time() - t0, 3)} s")
+            self.pot_grad_desc(data_train0=data, plot_allocation=plot_allocation)
 
-        t1 = time.time()
         pw_mat = pdist(X=self.data_trained, metric="euclidean")
         pw_mat = pw_mat > self.err.numpy().max()
         z = linkage(pw_mat)
@@ -511,11 +496,8 @@ class PQC:
         for i, (k, c) in enumerate(sgd_labels_tuple):
             self.sgd_labels[sgd_labels_pre == k] = i
 
-        print(f"Time to get labels from connected pairs: {round(time.time() - t1, 3)} s")
-
         self.k_num = np.max(self.sgd_labels) + 1
-        print(f"Detected {self.k_num} clusters, having {np.sum(self.sgd_labels == 0)} samples the"
-              f" most populated cluster.")
+        return self.k_num
 
     @staticmethod
     def get_labels_from_connected_pairs(con_pairs: np.ndarray, data_size: int):
@@ -574,7 +556,6 @@ class PQC:
                 ]
             )
 
-        print(f"Potential path runtime with {self.k_num} clusters: {round(time.time() - t0, 4)} s")
         return idx_pairs
 
     def compute_potential_distance(self, v1: np.ndarray, v2: np.ndarray, steps: int = 20):
@@ -612,14 +593,6 @@ class PQC:
         potential_matrix_min = np.where(potential_matrix > potential_matrix.T, potential_matrix.T, potential_matrix)
         potential_matrix_min_condensed = squareform(potential_matrix_min)
         potential_linkage = linkage(potential_matrix_min_condensed)
-
-        if plot_dendrogram:
-            plt.figure(dpi=100)
-            dendrogram(potential_linkage,
-                       orientation='top',
-                       distance_sort='descending',
-                       show_leaf_counts=True)
-            plt.show()
 
         return PQC.labels_from_linkage(potential_linkage)
 
@@ -671,40 +644,6 @@ class PQC:
             merged_loglikelihood[k] = ll  # if ll != 0 else np.nan
             merged_sample_proba_labels[:, k] = p_labels
 
-        if plot_results:
-            fig, ax = plt.subplots(2, 1,
-                                   dpi=150,
-                                   figsize=(10, 10),
-                                   gridspec_kw={'height_ratios': [1.5, 1]})
-            if "vector" not in self.sigmas_id[0]:
-                sigma_title = "_".join([str(x) for x in self.sigmas_id])
-            else:
-                sigma_title = "vector_mean_" + np.mean(self.sigmas_id[1]).round(3)
-
-            fig.suptitle('Labels by Energy merging with sigma: ' + sigma_title)
-            _ = dendrogram(potential_linkage,
-                           orientation='right',
-                           distance_sort='descending',
-                           show_leaf_counts=True,
-                           ax=ax[0])
-            ax[0].set_xlim(xmin=-1)
-            ax[1].plot(unique_energies_plus0, merged_loglikelihood, '-*')
-            ax[1].grid(which="both")
-            ax[1].set_xlim(xmin=-1)
-            ax[1].set_xlabel("Merging energy")
-            ax[1].set_ylabel("-Log-likelihood P(K|X)")
-            for i, k in enumerate(cluster_proba_number):
-                if k % 5 == 0:
-                    ax[1].annotate(
-                        str(k),
-                        xy=(unique_energies_plus0[i], merged_loglikelihood[i]),
-                        xytext=(-3, 3),
-                        textcoords='offset points',
-                        ha='right',
-                        va='bottom'
-                    )
-            plt.show()
-
         self.energy_merge_results.update(
             {
                 self.sigmas_id: {
@@ -743,59 +682,3 @@ class PQC:
             self.cluster_allocation_by_probability()
             do_it = self.hierarchical_energy_merge()
         t1 = time.time()
-
-        print(f"Scanning time: {round(t1 - t0, 3)} s")
-
-        if plot3d and len(self.energy_merge_results) > 0:
-            self.plot_3d_results()
-
-        print("End of function!")
-
-    def plot_3d_results(self, exclude_1cluster_solution: bool = False):
-        results = []
-        for k in self.energy_merge_results.keys():
-            if k[0] == "knn_ratio":
-                # energies = np.zeros(len(self.energy_merge_results[k]["energies"]) + 1)
-                # energies[1:] = self.energy_merge_results[k]["energies"]
-                energies = self.energy_merge_results[k]["energies"]
-                knn = k[1]
-                energy_max = max(energies)
-                ll = self.energy_merge_results[k]["merged_loglikelihood"]
-                results.append((energies, ll, knn, energy_max))
-        all_energies = np.unique(np.concatenate([x[0] for x in results]))
-        energy_mat = np.repeat(all_energies.reshape([-1, 1]), len(results), axis=1)
-        knn_mat = np.repeat(np.array([x[2] for x in results]).reshape([1, -1]), len(all_energies), axis=0)
-        ll_mat = np.zeros([len(all_energies), len(results)])
-        for i, res in enumerate(results):
-            f = interpolate.interp1d(res[0], res[1], fill_value="extrapolate", kind="previous")
-            ll_mat[:, i] = f(all_energies)
-
-        ll_mat = np.round(ll_mat, 4)
-        if exclude_1cluster_solution:
-            ll_mat[ll_mat == 0] = np.nan
-
-        plot_types = ["triangulation", "wireframe", "surface"]
-        plot_type = plot_types[2]
-        fig = plt.figure(dpi=150)
-        ax = fig.add_subplot(projection='3d')
-        if plot_type == "triangulation":
-            e_ravel = np.ravel(energy_mat)
-            knn_ravel = np.ravel(knn_mat)
-            ll_ravel = np.ravel(ll_mat)
-            p = ax.plot_trisurf(e_ravel, knn_ravel, ll_ravel, cmap='viridis', edgecolor='none')
-        elif plot_type == "wireframe":
-            p = ax.plot_wireframe(knn_mat, energy_mat, ll_mat, rstride=1, cstride=1)
-        else:
-            p = ax.plot_surface(knn_mat, energy_mat, ll_mat, rstride=1, cstride=1, cmap='viridis', edgecolor='none')
-        # ax.set_zlim([0.001, np.min([np.max(ll_mat), 1])])
-        ax.set_ylabel("Energies")
-        ax.set_xlabel("KNN ratio")
-        ax.set_zlabel("ALL")
-        ax.view_init(30, 30)
-        fig.colorbar(p, ax=ax)
-        # for angle in range(0, 360):
-        #     ax.view_init(30, angle)
-        #     plt.draw()
-        #     plt.pause(.001)
-        #     # plt.show()
-        plt.show()
