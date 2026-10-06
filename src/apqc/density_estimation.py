@@ -31,7 +31,8 @@ class DensityEstimator:
         if batch > self.N_gen:
             print("Batch is greater than the sample size, therefor it is reduced to sample size.")
         self.batch: int = min(batch, self.N_gen)
-        if scale is not None:
+        if scale is None:
+            # Default length scale: root mean square of the coordinates.
             self.scale = tf.cast(
                 tf.sqrt(
                     tf.reduce_mean(

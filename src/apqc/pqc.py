@@ -6,8 +6,6 @@ from itertools import combinations
 from math import pi
 from typing import Optional, Union, List, Tuple, Dict
 
-import matplotlib.pyplot as plt
-import seaborn as sns
 import networkx as nx
 from numba import jit
 import numpy as np
@@ -322,8 +320,20 @@ class PQC:
         norm_factor_rel = norm_factor / norm_factor_scale
         return norm_factor_rel, sigma_mat
 
-    @tf.function
     def qc_potential_cost(self, data_train, sigma_mat, norm_factor_rel):
+        """Quantum potential evaluated at ``data_train`` (one value per query point).
+
+        The input is read as a tensor *before* entering the compiled kernel.
+        Passing the mutable ``tf.Variable`` itself would make TensorFlow trace
+        and cache the shared compiled functions against that specific
+        variable; once a fitted model is garbage collected, later fits then
+        fail with dead weak-reference errors. Reading the value inside a
+        ``GradientTape`` is still recorded, so gradients are unaffected.
+        """
+        return self._qc_potential_cost(tf.convert_to_tensor(data_train), sigma_mat, norm_factor_rel)
+
+    @tf.function
+    def _qc_potential_cost(self, data_train, sigma_mat, norm_factor_rel):
         d2 = pairwise_d2_mat_v2(self.data_gen, data_train)
         # TODO: OOM ERROR.
         # Hint: If you want to see a list of allocated tensors when OOM happens, add report_tensor_allocations_upon_oom
@@ -481,11 +491,19 @@ class PQC:
 
         return loss, dx, dx2, self.step
 
-    def cluster_allocation_by_sgd(self, data: Optional[Union[np.ndarray, tf.Tensor]] = None, plot_allocation:bool = False):
-        if data is None:
-            self.pot_grad_desc(data_train0=self.data_gen, plot_allocation=plot_allocation)
-        else:
-            self.pot_grad_desc(data_train0=data, plot_allocation=plot_allocation)
+    def cluster_allocation_by_sgd(self,
+                                  data: Optional[Union[np.ndarray, tf.Tensor]] = None,
+                                  plot_allocation: bool = False,
+                                  steps: int = 20000,
+                                  patience: int = 4):
+        """Descend every point to its potential well and label points by well.
+
+        ``steps`` caps the gradient-descent budget and ``patience`` is the number
+        of non-improving steps tolerated before stopping (see ``pot_grad_desc``).
+        """
+        data_train0 = self.data_gen if data is None else data
+        self.pot_grad_desc(data_train0=data_train0, steps=steps, patience=patience,
+                           plot_allocation=plot_allocation)
 
         pw_mat = pdist(X=self.data_trained, metric="euclidean")
         pw_mat = pw_mat > self.err.numpy().max()
@@ -576,7 +594,7 @@ class PQC:
     def compute_shortest_path(self, potential_pairs):
         graph = nx.DiGraph()
         graph.add_weighted_edges_from(potential_pairs)
-        ap_sp = nx.shortest_paths.floyd_warshall(graph)
+        ap_sp = nx.floyd_warshall(graph)
 
         potential_mat = np.zeros([self.k_num, self.k_num])
         for i, i_dict in ap_sp.items():
